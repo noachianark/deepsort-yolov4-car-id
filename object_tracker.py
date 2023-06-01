@@ -15,6 +15,8 @@ from core.config import cfg
 from PIL import Image
 import cv2
 import numpy as np
+# 在导入部分添加
+import math
 import matplotlib.pyplot as plt
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
@@ -200,21 +202,51 @@ def main(_argv):
         tracker.predict()
         tracker.update(detections)
 
+        # 在主循环开始前定义安全区域和参考物体
+        safe_distance = 10  # 安全距离，单位可以是米
+        ref_obj_size = 1.7  # 参考物体的真实大小，单位可以是米
+        ref_obj_pixels = 500  # 参考物体在画面中的大小，单位是像素
+        
+        frame_center = (frame.shape[1] // 2, frame.shape[0] // 2)  # 画面的中心点
+        safe_region = np.array([[0, frame.shape[0]], frame_center, [frame.shape[1], frame.shape[0]]])  # 安全区域的顶点
+        fov = 140
+
         # update tracks
         for track in tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue 
             bbox = track.to_tlbr()
             class_name = track.get_class()
-            
         # draw bbox on screen
             color = colors[int(track.track_id) % len(colors)]
             color = [i * 255 for i in color]
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1]-30)), (int(bbox[0])+(len(class_name)+len(str(track.track_id)))*17, int(bbox[1])), color, -1)
             cv2.putText(frame, class_name + "-" + str(track.track_id),(int(bbox[0]), int(bbox[1]-10)),0, 0.75, (255,255,255),2)
+            # 计算物体的大小
+            obj_pixels = math.sqrt((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
+            # 在物体的边界框上添加像素大小
+            cv2.putText(frame, f"Pixels: {obj_pixels:.1f}", (int(bbox[0]), int(bbox[1] - 60)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
-        # if enable info flag then print details about each track
+            # 计算物体的中心离图像中心的距离
+            obj_center = ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+            distance_to_center = math.sqrt((obj_center[0] - original_w / 2) ** 2 + (obj_center[1] - original_h / 2) ** 2)
+            # 计算调整因子
+            adjustment = 1 + distance_to_center / (original_w / 2) * math.tan(fov / 2)
+            # 估计物体的距离
+            obj_distance = ref_obj_size * ref_obj_pixels / obj_pixels * adjustment
+            # 在物体的边界框上添加距离
+            cv2.putText(frame, f"{obj_distance:.1f}m", (int(bbox[0]), int(bbox[1] - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+            # 计算物体的边界框与安全区域的交集
+            obj_region = np.array([[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]]], dtype=np.float32)
+            safe_region_float = safe_region.astype(np.float32)
+            intersection, _ = cv2.intersectConvexConvex(safe_region_float, obj_region)
+            # 如果交集是一个多边形，并且其面积大于物体的面积的一半，并且物体的距离小于安全距离，添加警告
+            if isinstance(intersection, np.ndarray) and cv2.contourArea(intersection.astype(np.int32)) > cv2.contourArea(obj_region.astype(np.int32)) / 2 and obj_distance < safe_distance:
+                cv2.putText(frame, "Danger", (int(bbox[0]), int(bbox[1] - 40)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0,255), 2)
+            # 在每一帧的结束时，绘制安全区域
+            cv2.polylines(frame, [safe_region], True, (0, 255, 0), 2)
+            # if enable info flag then print details about each track
             if FLAGS.info:
                 print("Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}".format(str(track.track_id), class_name, (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
 
