@@ -39,6 +39,9 @@ flags.DEFINE_float('score', 0.50, 'score threshold')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
 flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
+# 在代码开始部分添加offset参数
+flags.DEFINE_string('offset', '0,0', 'offset of the center point')
+
 
 def main(_argv):
     # Definition of the parameters
@@ -204,11 +207,13 @@ def main(_argv):
 
         # 在主循环开始前定义安全区域和参考物体
         safe_distance = 10  # 安全距离，单位可以是米
-        ref_obj_size = 1.7  # 参考物体的真实大小，单位可以是米
-        ref_obj_pixels = 500  # 参考物体在画面中的大小，单位是像素
-        
-        frame_center = (frame.shape[1] // 2, frame.shape[0] // 2)  # 画面的中心点
-        safe_region = np.array([[0, frame.shape[0]], frame_center, [frame.shape[1], frame.shape[0]]])  # 安全区域的顶点
+        ref_obj_size = 1.8  # 参考物体的真实大小，单位可以是米
+        ref_obj_pixels = 1080  # 参考物体在画面中的大小，单位是像素
+        # 在主循环中，获取offset参数并转换为整数列表
+        offset = [int(x) for x in FLAGS.offset.split(',')]
+        frame_center = ((frame.shape[1] // 2) + offset[0], (frame.shape[0] // 2) + offset[1]) # 画面的中心点
+        safe_region = np.array([[0, frame.shape[0]], list(frame_center), [frame.shape[1], frame.shape[0]]]) # 安全区域的顶点
+
         fov = 140
 
         # update tracks
