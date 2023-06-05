@@ -14,6 +14,7 @@ from tensorflow.python.saved_model import tag_constants
 from core.config import cfg
 from PIL import Image
 import cv2
+import os
 import numpy as np
 # 在导入部分添加
 import math
@@ -33,10 +34,10 @@ flags.DEFINE_boolean('tiny', False, 'yolo or yolo-tiny')
 flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
 flags.DEFINE_string('video', './data/video/test.mp4', 'path to input video or set to 0 for webcam')
 flags.DEFINE_string('output', None, 'path to output video')
-flags.DEFINE_string('output_format', 'XVID', 'codec used in VideoWriter when saving video to file')
+flags.DEFINE_string('output_format', 'mp4v', 'codec used in VideoWriter when saving video to file')
 flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.50, 'score threshold')
-flags.DEFINE_boolean('dont_show', False, 'dont show video output')
+flags.DEFINE_boolean('dont_show', True, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
 flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 # 在代码开始部分添加offset参数
@@ -44,6 +45,16 @@ flags.DEFINE_string('offset', '0,0', 'offset of the center point')
 
 
 def main(_argv):
+    # 获取输入文件的基本名
+    input_basename = os.path.basename(FLAGS.video)
+    # 去掉扩展名
+    input_basename_no_ext = os.path.splitext(input_basename)[0]
+    # 设置输出文件路径
+    output_path = os.path.join('../outputs/', f'{input_basename_no_ext}.mp4')
+
+    # 更新FLAGS.output
+    FLAGS.output = output_path
+
     # Definition of the parameters
     max_cosine_distance = 0.4
     nn_budget = None
@@ -247,10 +258,11 @@ def main(_argv):
             safe_region_float = safe_region.astype(np.float32)
             intersection, _ = cv2.intersectConvexConvex(safe_region_float, obj_region)
             # 如果交集是一个多边形，并且其面积大于物体的面积的一半，并且物体的距离小于安全距离，添加警告
-            if isinstance(intersection, np.ndarray) and cv2.contourArea(intersection.astype(np.int32)) > cv2.contourArea(obj_region.astype(np.int32)) / 2 and obj_distance < safe_distance:
+            if isinstance(intersection, np.ndarray) and obj_distance < safe_distance:
                 cv2.putText(frame, "Danger", (int(bbox[0]), int(bbox[1] - 40)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0,255), 2)
             # 在每一帧的结束时，绘制安全区域
             cv2.polylines(frame, [safe_region], True, (0, 255, 0), 2)
+            cv2.putText(frame, f"Offset: {FLAGS.offset}", (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
             # if enable info flag then print details about each track
             if FLAGS.info:
                 print("Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}".format(str(track.track_id), class_name, (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
