@@ -50,7 +50,7 @@ def main(_argv):
     # 去掉扩展名
     input_basename_no_ext = os.path.splitext(input_basename)[0]
     # 设置输出文件路径
-    output_path = os.path.join('../outputs/', f'{input_basename_no_ext}.mp4')
+    output_path = os.path.join('./outputs/', f'{input_basename_no_ext}.mp4')
 
     # 更新FLAGS.output
     FLAGS.output = output_path

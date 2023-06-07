@@ -1,6 +1,8 @@
-./inputs
-./outputs
-./tools/__pycache__
-./deep_sort/__pycache__
-./core/__pycache__
-./checkpoints
+inputs
+outputs
+tools/__pycache__
+deep_sort/__pycache__
+core/__pycache__
+checkpoints
+data/yolov4.cfg
+data/yolov4.weights
